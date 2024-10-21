@@ -1,6 +1,6 @@
 const std = @import("std");
+const cli = @import("frontends/cli.zig");
 
-pub fn main() void {
-    // Prints to stderr (it's a shortcut based on `std.io.getStdErr()`)
-    std.debug.print("Initializing MasterZig...\n", .{});
+pub fn main() !void {
+    try cli.play();
 }
