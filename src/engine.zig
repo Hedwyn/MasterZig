@@ -81,7 +81,7 @@ pub const Row = get_row_structure(default_color_count, default_row_width);
 pub const default_game_params = GameParameters{};
 
 pub const GameBoard = struct {
-    cells: []Row,
+    cells: []Row = undefined,
     current_row: usize = 0,
 
     comptime params: *const GameParameters = &default_game_params,
@@ -105,11 +105,11 @@ pub const GameBoard = struct {
         allocator.destroy(self);
     }
 
-    pub fn set_cell_at_row(self: *GameBoard, row_index: usize, column_index: usize, color: u32) MastermindError!void {
+    pub fn set_cell_at_row(self: *GameBoard, row_index: usize, column_index: usize, color: u64) MastermindError!void {
         try self.cells[row_index].set_cell(column_index, color);
     }
 
-    pub fn set_cell(self: *GameBoard, column_index: usize, color: u32) MastermindError!void {
+    pub fn set_cell(self: *GameBoard, column_index: usize, color: u64) MastermindError!void {
         return try self.set_cell_at_row(self.current_row, column_index, color);
     }
 
@@ -128,8 +128,13 @@ pub const GameBoard = struct {
     pub inline fn get_secret(self: *GameBoard) Row {
         return self.cells[0];
     }
-    pub fn evaluate_row(self: *GameBoard, row_index: ?usize) *RowScore {
-        return self.cells[row_index].evaluate(self.get_secret());
+
+    pub fn evaluate_row(self: *GameBoard, row_index: ?usize) RowScore {
+        return self.cells[row_index orelse self.current_row].evaluate(self.get_secret());
+    }
+
+    pub fn evaluate_last(self: *GameBoard) RowScore {
+        return self.cells[self.current_row].evaluate(self.get_secret());
     }
 };
 
@@ -175,4 +180,18 @@ test "alloc game board" {
     const allocator = std.heap.page_allocator;
     const board = try GameBoard.create(&allocator, null);
     _ = board;
+}
+
+test "evaluate last" {
+    const colors = get_color_set(8);
+    const allocator = std.heap.page_allocator;
+    var board = try GameBoard.create(&allocator, null);
+
+    for (0..default_row_width) |i| {
+        try board.set_cell(i, colors[i]);
+    }
+    const result = board.evaluate_last();
+    try std.testing.expectEqual(5, result.correct_color);
+    try std.testing.expectEqual(0, result.correct_token);
+    try std.testing.expectEqual(board.evaluate_row(0), result);
 }
