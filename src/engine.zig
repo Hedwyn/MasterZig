@@ -101,7 +101,7 @@ pub const GameBoard = struct {
         return new_board;
     }
     pub fn destroy(self: *GameBoard, allocator: *const std.mem.Allocator) void {
-        allocator.destroy(self.cells);
+        allocator.destroy(&self.cells);
         allocator.destroy(self);
     }
 
@@ -179,7 +179,7 @@ test "init game" {
 test "alloc game board" {
     const allocator = std.heap.page_allocator;
     const board = try GameBoard.create(&allocator, null);
-    _ = board;
+    defer board.destroy(&allocator);
 }
 
 test "evaluate last" {

@@ -9,20 +9,23 @@ const Reader = File.Reader;
 const _base_color_set: [8]u64 = engine.get_color_set(8);
 
 pub const CliError = error{
+    InvalidColor,
     LineTooLong,
 };
 
-pub const Color = enum(u64) {
+const GameError = CliError || engine.MastermindError;
+
+pub const Color = enum(u32) {
     red = _base_color_set[0],
     green = _base_color_set[1],
     blue = _base_color_set[2],
     yellow = _base_color_set[3],
     brown = _base_color_set[4],
     pink = _base_color_set[5],
-    gray = _base_color_set[6],
+    turquoise = _base_color_set[6],
     orange = _base_color_set[7],
 
-    pub fn toStr(self: Color) []const u8 {
+    pub fn to_str(self: Color) []const u8 {
         return switch (self) {
             .red => "R",
             .green => "G",
@@ -30,8 +33,23 @@ pub const Color = enum(u64) {
             .yellow => "Y",
             .brown => "W",
             .pink => "P",
-            .gray => "G",
+            .turquoise => "T",
             .orange => "O",
+        };
+    }
+
+    pub fn from_str(char: u8) CliError!Color {
+        return switch (char) {
+            'R' => .red,
+            'G',
+            => .green,
+            'B' => .blue,
+            'Y' => .yellow,
+            'W' => .brown,
+            'P' => .pink,
+            'T' => .turquoise,
+            'O' => .orange,
+            else => CliError.InvalidColor,
         };
     }
 };
@@ -55,7 +73,6 @@ pub const Console = struct {
     }
 
     pub fn flush_input(self: *Console) !void {
-        // while (try self.reader.readAll(&self.buffer) > 0) {}
         while (try self.reader.readByte() != '\n') {}
     }
 
@@ -69,23 +86,46 @@ pub const Console = struct {
     }
 };
 
-pub const GameRenderer = struct {
+pub const GameRunner = struct {
     console: *Console,
     board: *engine.GameBoard,
+
+    pub fn process_user_input(self: *GameRunner, input: [buffer_len]u8) GameError!void {
+        for (0.., input) |idx, char| {
+            // TODO: switch to null-terminated string
+            if (char == '\n') {
+                break;
+            }
+            if (idx >= self.board.params.row_width) {
+                return GameError.LineTooLong;
+            }
+            const color = try Color.from_str(char);
+            try self.board.set_cell(idx, @intFromEnum(color));
+        }
+        const score = self.board.evaluate_last();
+        std.debug.print("Your score: {}\n", .{score});
+    }
 };
 
 pub fn play() !void {
     var console = Console.create();
-    console.write("Starting MasterZig !\n");
     const allocator = std.heap.page_allocator;
-    const board = try engine.GameBoard.create(&allocator, null);
-    defer allocator.destroy(board);
+    var board = try engine.GameBoard.create(&allocator, null);
+    defer board.destroy(&allocator);
 
-    for (0..3) |_| {
-        const user_input = console.read() catch {
+    var renderer = GameRunner{ .console = &console, .board = board };
+    console.write("Starting MasterZig !\n");
+
+    // TODO: set secret with random data
+
+    // Revealing secret for debugging
+    std.debug.print("Secret is {}\n", .{board.get_secret()});
+    for (0..12) |_| {
+        const player_input = console.read() catch {
             std.debug.print("Line is too long !\n", .{});
             continue;
         };
-        std.debug.print("User input is: {s}", .{user_input});
+        try renderer.process_user_input(player_input);
+        std.debug.print("User input is: {s}", .{player_input});
     }
 }
