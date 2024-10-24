@@ -6,6 +6,7 @@ const File = std.fs.File;
 const Writer = File.Writer;
 const Reader = File.Reader;
 
+const assert = std.debug.assert;
 const _base_color_set: [8]u64 = engine.get_color_set(8);
 
 pub const CliError = error{
@@ -72,6 +73,10 @@ pub const Console = struct {
         _ = self.writer.write(bytes) catch unreachable;
     }
 
+    pub fn print(self: *Console, comptime fmt: []const u8, args: anytype) void {
+        _ = self.writer.print(fmt, args) catch unreachable;
+    }
+
     pub fn flush_input(self: *Console) !void {
         while (try self.reader.readByte() != '\n') {}
     }
@@ -90,6 +95,30 @@ pub const GameRunner = struct {
     console: *Console,
     board: *engine.GameBoard,
 
+    pub fn set_secret(self: *GameRunner) GameError!void {
+        assert(self.board.current_row == 0);
+        self.console.write("Input your secret here:\n");
+        const player_input = try self.console.read();
+        try self.process_user_input(player_input);
+        self.console.write("Secret saved !");
+    }
+
+    pub fn show_last_row(self: *GameRunner) void {
+        const raw_colors = self.board.get_last_row();
+        for (raw_colors) |color_value| {
+            const color: Color = @enumFromInt(color_value);
+            const repr = color.to_str();
+            self.console.write(repr);
+        }
+        self.console.write("\n");
+    }
+    pub fn play_next(self: *GameRunner) GameError!void {
+        const player_input = try self.console.read();
+        try self.process_user_input(player_input);
+        const score = self.board.evaluate_last();
+        self.console.print("Your score: {}", .{score});
+    }
+
     pub fn process_user_input(self: *GameRunner, input: [buffer_len]u8) GameError!void {
         for (0.., input) |idx, char| {
             // TODO: switch to null-terminated string
@@ -102,8 +131,6 @@ pub const GameRunner = struct {
             const color = try Color.from_str(char);
             try self.board.set_cell(idx, @intFromEnum(color));
         }
-        const score = self.board.evaluate_last();
-        std.debug.print("Your score: {}\n", .{score});
     }
 };
 
@@ -113,19 +140,17 @@ pub fn play() !void {
     var board = try engine.GameBoard.create(&allocator, null);
     defer board.destroy(&allocator);
 
-    var renderer = GameRunner{ .console = &console, .board = board };
+    var runner = GameRunner{ .console = &console, .board = board };
     console.write("Starting MasterZig !\n");
 
     // TODO: set secret with random data
-
+    try runner.set_secret();
+    console.write("Your secret is:\n");
+    runner.show_last_row();
     // Revealing secret for debugging
-    std.debug.print("Secret is {}\n", .{board.get_secret()});
     for (0..12) |_| {
-        const player_input = console.read() catch {
-            std.debug.print("Line is too long !\n", .{});
-            continue;
-        };
-        try renderer.process_user_input(player_input);
-        std.debug.print("User input is: {s}", .{player_input});
+        try runner.play_next();
+        console.write("You played:\n");
+        runner.show_last_row();
     }
 }

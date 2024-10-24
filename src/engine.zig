@@ -11,6 +11,7 @@ pub const MastermindError = error{
     OutOfBoundRowIdx,
     InvalidColor,
     GameLost,
+    EmptyRow,
 };
 
 /// A container for all settings required for the game
@@ -29,7 +30,7 @@ pub const RowScore = struct {
     correct_token: u32 = 0,
 };
 
-pub fn get_row_structure(color_count: comptime_int, width: comptime_int) type {
+pub fn getRowStructure(color_count: comptime_int, width: comptime_int) type {
     return struct {
         value: u64 = 0,
         comptime color_count: usize = color_count,
@@ -51,6 +52,29 @@ pub fn get_row_structure(color_count: comptime_int, width: comptime_int) type {
             }
             // applying bit shift to place color in the correct column
             self.value |= color << @truncate(cell_index * self.color_count);
+        }
+
+        inline fn _get_cell(self: *Row, cell_index: usize) u64 {
+            const shift: u6 = @truncate(cell_index * color_count);
+            const mask: u64 = (1 << color_count) - 1;
+            const shifted_mask = mask << shift;
+            const masked = self.value & shifted_mask;
+            return (masked >> shift);
+        }
+
+        pub fn get_cell(self: *Row, cell_index: usize) MastermindError!u64 {
+            if (cell_index >= width) {
+                return MastermindError.OutOfBoundRowIdx;
+            }
+            return self._get_cell(cell_index);
+        }
+
+        pub fn get_all(self: *Row) [width]u64 {
+            var colors: [width]u64 = undefined;
+            for (0..width) |i| {
+                colors[i] = self._get_cell(i);
+            }
+            return colors;
         }
 
         pub fn evaluate(self: Self, secret: Self) RowScore {
@@ -76,7 +100,7 @@ pub fn get_row_structure(color_count: comptime_int, width: comptime_int) type {
     };
 }
 
-pub const Row = get_row_structure(default_color_count, default_row_width);
+pub const Row = getRowStructure(default_color_count, default_row_width);
 
 pub const default_game_params = GameParameters{};
 
@@ -111,6 +135,14 @@ pub const GameBoard = struct {
 
     pub fn set_cell(self: *GameBoard, column_index: usize, color: u64) MastermindError!void {
         return try self.set_cell_at_row(self.current_row, column_index, color);
+    }
+
+    pub fn get_row(self: *GameBoard, row_index: ?usize) [default_row_width]u64 {
+        return self.cells[row_index orelse self.current_row].get_all();
+    }
+
+    pub fn get_last_row(self: *GameBoard) [default_row_width]u64 {
+        return self.get_row(null);
     }
 
     pub fn is_lost(self: *GameBoard) bool {
@@ -156,6 +188,29 @@ test "set row color" {
     try testing.expectEqual(colors[0], 0x1);
     try testing.expectEqual(colors[1], 0x2);
     try testing.expectEqual(row.value, 0x1008040201);
+}
+
+test "get cell color" {
+    const colors = get_color_set(8);
+    var row = Row.new();
+    for (0..default_row_width) |i| {
+        try row.set_cell(i, colors[i]);
+    }
+    for (0..default_row_width) |i| {
+        try testing.expectEqual(colors[i], row.get_cell(i));
+    }
+}
+
+test "get all colors" {
+    const colors = get_color_set(8);
+    var row = Row.new();
+    for (0..default_row_width) |i| {
+        try row.set_cell(i, colors[i]);
+    }
+    const obtained_colors = row.get_all();
+    for (0..default_row_width) |i| {
+        try testing.expectEqual(colors[i], obtained_colors[i]);
+    }
 }
 
 test "evaluate row" {
