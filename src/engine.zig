@@ -137,12 +137,23 @@ pub const GameBoard = struct {
         return try self.set_cell_at_row(self.current_row, column_index, color);
     }
 
-    pub fn get_row(self: *GameBoard, row_index: ?usize) [default_row_width]u64 {
+    pub fn get_row(self: *GameBoard, row_index: ?usize) [GameBoard.params.row_width]u64 {
         return self.cells[row_index orelse self.current_row].get_all();
     }
 
-    pub fn get_last_row(self: *GameBoard) [default_row_width]u64 {
+    pub fn get_last_row(self: *GameBoard) [GameBoard.params.row_width]u64 {
         return self.get_row(null);
+    }
+
+    pub fn set_row(self: *GameBoard, row_index: usize, row: [GameBoard.params.row_width]u64) void {
+        for (0..self.params.row_width) |i| {
+            self.set_cell_at_row(row_index, i, row[i]);
+        }
+    }
+
+    pub fn play_next_move(self: *GameBoard, row: [GameBoard.params.row_width]u64) void {
+        self.set_row(self.current_row, row);
+        self.current_row += 1;
     }
 
     pub fn is_lost(self: *GameBoard) bool {
