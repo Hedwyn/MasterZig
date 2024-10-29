@@ -42,8 +42,7 @@ pub const Color = enum(u32) {
     pub fn from_str(char: u8) CliError!Color {
         return switch (char) {
             'R' => .red,
-            'G',
-            => .green,
+            'G' => .green,
             'B' => .blue,
             'Y' => .yellow,
             'W' => .brown,
@@ -105,7 +104,10 @@ pub const GameRunner = struct {
 
     pub fn show_last_row(self: *GameRunner) void {
         const raw_colors = self.board.get_last_row();
+        std.log.debug("raw_colors {any}", .{raw_colors});
+
         for (raw_colors) |color_value| {
+            std.log.debug("Converting value 0x{x} to enum", .{color_value});
             const color: Color = @enumFromInt(color_value);
             const repr = color.to_str();
             self.console.write(repr);
@@ -131,6 +133,7 @@ pub const GameRunner = struct {
             const color = try Color.from_str(char);
             try self.board.set_cell(idx, @intFromEnum(color));
         }
+        self.board.current_row += 1;
     }
 };
 
@@ -139,7 +142,7 @@ pub fn play() !void {
     const allocator = std.heap.page_allocator;
     var board = try engine.GameBoard.create(&allocator, null);
     defer board.destroy(&allocator);
-
+    std.log.debug("Color values: {any}", .{_base_color_set});
     var runner = GameRunner{ .console = &console, .board = board };
     console.write("Starting MasterZig !\n");
 
@@ -149,6 +152,7 @@ pub fn play() !void {
     runner.show_last_row();
     // Revealing secret for debugging
     for (0..12) |_| {
+        console.write("Play your next turn !\n");
         try runner.play_next();
         console.write("You played:\n");
         runner.show_last_row();
