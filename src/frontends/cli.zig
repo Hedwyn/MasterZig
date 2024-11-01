@@ -12,6 +12,7 @@ const _base_color_set: [8]u64 = engine.get_color_set(8);
 pub const CliError = error{
     InvalidColor,
     LineTooLong,
+    LineTooShort,
 };
 
 const GameError = CliError || engine.MastermindError;
@@ -80,9 +81,14 @@ pub const Console = struct {
         while (try self.reader.readByte() != '\n') {}
     }
 
-    pub fn read(self: *Console) CliError![buffer_len]u8 {
-        const input_len = self.reader.read(&self.buffer) catch unreachable;
-        if (input_len == buffer_len) {
+    pub fn read(self: *Console, len: usize) CliError![buffer_len]u8 {
+        assert(len < buffer_len);
+        for (0..len + 1) |i| {
+            self.buffer[i] = self.reader.readByte() catch {
+                return CliError.LineTooShort;
+            };
+        }
+        if (self.buffer[len] != '\n') {
             self.flush_input() catch unreachable;
             return CliError.LineTooLong;
         }
@@ -100,7 +106,7 @@ pub fn GameRunner(parameters: engine.GameParameters) type {
         pub fn set_secret(self: *Self) GameError!void {
             assert(self.board.current_row == 0);
             self.console.write("Input your secret here:\n");
-            const player_input = try self.console.read();
+            const player_input = try self.console.read(params.row_width);
             std.log.debug("Input echo: {s}", .{player_input});
             try self.process_user_input(player_input);
             self.console.write("Secret saved !\n");
@@ -112,7 +118,7 @@ pub fn GameRunner(parameters: engine.GameParameters) type {
             std.log.debug("raw_colors {any}", .{raw_colors});
 
             for (raw_colors) |color_value| {
-                std.log.debug("Converting value 0x{x} to enum", .{color_value});
+                // std.log.debug("Converting value 0x{x} to enum", .{color_value});
                 const color: Color = @enumFromInt(color_value);
                 const repr = color.to_str();
                 self.console.write(repr);
@@ -120,7 +126,7 @@ pub fn GameRunner(parameters: engine.GameParameters) type {
             self.console.write("\n");
         }
         pub fn play_next(self: *Self) GameError!void {
-            const player_input = try self.console.read();
+            const player_input = try self.console.read(params.row_width);
             std.log.debug("Input echo: {s}", .{player_input});
             try self.process_user_input(player_input);
             const score = self.board.evaluate_last();
