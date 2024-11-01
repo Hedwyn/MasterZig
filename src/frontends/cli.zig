@@ -101,8 +101,10 @@ pub fn GameRunner(parameters: engine.GameParameters) type {
             assert(self.board.current_row == 0);
             self.console.write("Input your secret here:\n");
             const player_input = try self.console.read();
+            std.log.debug("Input echo: {s}", .{player_input});
             try self.process_user_input(player_input);
-            self.console.write("Secret saved !");
+            self.console.write("Secret saved !\n");
+            self.show_last_row();
         }
 
         pub fn show_last_row(self: *Self) void {
@@ -119,9 +121,11 @@ pub fn GameRunner(parameters: engine.GameParameters) type {
         }
         pub fn play_next(self: *Self) GameError!void {
             const player_input = try self.console.read();
+            std.log.debug("Input echo: {s}", .{player_input});
             try self.process_user_input(player_input);
             const score = self.board.evaluate_last();
             self.console.print("Your score: {}", .{score});
+            self.board.current_row += 1;
         }
 
         pub fn process_user_input(self: *Self, input: [buffer_len]u8) GameError!void {
@@ -136,13 +140,23 @@ pub fn GameRunner(parameters: engine.GameParameters) type {
                 const color = try Color.from_str(char);
                 try self.board.set_cell(idx, @intFromEnum(color));
             }
-            self.board.current_row += 1;
         }
     };
 }
 
-pub fn play() !void {
-    var console = Console.create();
+pub fn play(from_file: ?[]const u8) !void {
+    var console: Console = undefined;
+    if (from_file == null) {
+        console = Console.create();
+    } else {
+        const file = try std.fs.cwd().openFile(from_file orelse unreachable, .{});
+        const reader = file.reader();
+        console = Console{
+            .reader = reader, //
+            .writer = std.io.getStdOut().writer(),
+        };
+    }
+
     const allocator = std.heap.page_allocator;
     var board = try engine.GameBoard(engine.default_game_params).create(&allocator);
     defer board.destroy(&allocator);
