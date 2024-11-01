@@ -30,7 +30,7 @@ pub const RowScore = struct {
     correct_token: u32 = 0,
 };
 
-pub fn getRowStructure(color_count: comptime_int, width: comptime_int) type {
+pub fn Row(color_count: comptime_int, width: comptime_int) type {
     return struct {
         value: u64 = 0,
         comptime color_count: usize = color_count,
@@ -54,7 +54,7 @@ pub fn getRowStructure(color_count: comptime_int, width: comptime_int) type {
             self.value |= color << @truncate(cell_index * self.color_count);
         }
 
-        inline fn _get_cell(self: *Row, cell_index: usize) u64 {
+        inline fn _get_cell(self: *Self, cell_index: usize) u64 {
             const shift: u6 = @truncate(cell_index * color_count);
             const mask: u64 = (1 << color_count) - 1;
             const shifted_mask = mask << shift;
@@ -62,14 +62,14 @@ pub fn getRowStructure(color_count: comptime_int, width: comptime_int) type {
             return (masked >> shift);
         }
 
-        pub fn get_cell(self: *Row, cell_index: usize) MastermindError!u64 {
+        pub fn get_cell(self: *Self, cell_index: usize) MastermindError!u64 {
             if (cell_index >= width) {
                 return MastermindError.OutOfBoundRowIdx;
             }
             return self._get_cell(cell_index);
         }
 
-        pub fn get_all(self: *Row) [width]u64 {
+        pub fn get_all(self: *Self) [width]u64 {
             var colors: [width]u64 = undefined;
             for (0..width) |i| {
                 colors[i] = self._get_cell(i);
@@ -100,21 +100,20 @@ pub fn getRowStructure(color_count: comptime_int, width: comptime_int) type {
     };
 }
 
-pub const Row = getRowStructure(default_color_count, default_row_width);
-
 pub const default_game_params = GameParameters{};
 
 pub fn GameBoard(comptime parameters: GameParameters) type {
     return struct {
-        cells: []Row = undefined,
+        cells: []Row(parameters.color_count, parameters.row_width) = undefined,
         current_row: usize = 0,
         const params: GameParameters = parameters;
         const Self = @This();
+        const GameRow = Row(parameters.color_count, parameters.row_width);
 
         pub fn create(allocator: *const std.mem.Allocator) !*Self {
             const game_params = params;
             const board_size = game_params.get_total_size();
-            const cells = try allocator.alloc(Row, board_size);
+            const cells = try allocator.alloc(GameRow, board_size);
             const new_board = try allocator.create(Self);
             for (cells) |*cell| {
                 cell.* = .{ .value = 0 };
@@ -168,7 +167,7 @@ pub fn GameBoard(comptime parameters: GameParameters) type {
             self.current_row += 1;
         }
 
-        pub inline fn get_secret(self: *Self) Row {
+        pub inline fn get_secret(self: *Self) GameRow {
             return self.cells[0];
         }
 
@@ -193,9 +192,11 @@ pub fn get_color_set(comptime color_count: comptime_int) [color_count]u64 {
     return colors;
 }
 
+const TestRow = Row(default_game_params.color_count, default_game_params.row_width);
+
 test "set row color" {
     const colors = get_color_set(8);
-    var row = Row.new();
+    var row = TestRow.new();
     for (0..default_row_width) |i| {
         try row.set_cell(i, colors[i]);
     }
@@ -206,7 +207,7 @@ test "set row color" {
 
 test "get cell color" {
     const colors = get_color_set(8);
-    var row = Row.new();
+    var row = TestRow.new();
     for (0..default_row_width) |i| {
         try row.set_cell(i, colors[i]);
     }
@@ -217,7 +218,7 @@ test "get cell color" {
 
 test "get all colors" {
     const colors = get_color_set(8);
-    var row = Row.new();
+    var row = TestRow.new();
     for (0..default_row_width) |i| {
         try row.set_cell(i, colors[i]);
     }
@@ -229,7 +230,7 @@ test "get all colors" {
 
 test "evaluate row" {
     const colors = get_color_set(8);
-    var row = Row.new();
+    var row = TestRow.new();
 
     for (0..default_row_width) |i| {
         try row.set_cell(i, colors[i]);
@@ -240,7 +241,7 @@ test "evaluate row" {
 }
 
 test "init game" {
-    var cells = [_]Row{.{ .value = 0 }} ** default_game_size;
+    var cells = [_]TestRow{.{ .value = 0 }} ** default_game_size;
     const board = TestGameBoard{ .cells = &cells };
     _ = board;
 }
