@@ -143,13 +143,15 @@ pub fn GameRunner(parameters: engine.GameParameters) type {
             }
             self.console.write("\n");
         }
-        pub fn play_next(self: *Self) GameError!void {
+        pub fn play_next(self: *Self) GameError!bool {
             var player_input: [params.row_width]u8 = undefined;
             try self.console.readToBuffer(&player_input);
             std.log.debug("Input echo: {s}", .{player_input});
             try self.board.play_next_move(try process_user_input((player_input)));
             const score = self.board.evaluate_last();
             self.console.print("Your score: {}\n", .{score});
+            // Is it won ?
+            return (score.correct_color == params.row_width);
         }
     };
 }
@@ -184,7 +186,10 @@ pub fn play(from_file: ?[]const u8) !void {
     // Revealing secret for debugging
     for (0..3) |_| {
         console.write("Play your next turn !\n");
-        try runner.play_next();
+        if (try runner.play_next()) {
+            console.write("Congratulations, you won !\n");
+            return;
+        }
         std.log.debug("Tour {}", .{board.current_row});
         console.write("You played:\n");
         runner.show_last_row();
