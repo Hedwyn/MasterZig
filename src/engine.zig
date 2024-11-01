@@ -104,82 +104,85 @@ pub const Row = getRowStructure(default_color_count, default_row_width);
 
 pub const default_game_params = GameParameters{};
 
-pub const GameBoard = struct {
-    cells: []Row = undefined,
-    current_row: usize = 0,
+pub fn GameBoard(comptime parameters: GameParameters) type {
+    return struct {
+        cells: []Row = undefined,
+        current_row: usize = 0,
+        const params: GameParameters = parameters;
+        const Self = @This();
 
-    comptime params: *const GameParameters = &default_game_params,
-
-    pub fn create(allocator: *const std.mem.Allocator, comptime params: ?*GameParameters) !*GameBoard {
-        const game_params = params orelse &default_game_params;
-        const board_size = game_params.get_total_size();
-        const cells = try allocator.alloc(Row, board_size);
-        const new_board = try allocator.create(GameBoard);
-        for (cells) |*cell| {
-            cell.* = .{ .value = 0 };
+        pub fn create(allocator: *const std.mem.Allocator) !*Self {
+            const game_params = params;
+            const board_size = game_params.get_total_size();
+            const cells = try allocator.alloc(Row, board_size);
+            const new_board = try allocator.create(Self);
+            for (cells) |*cell| {
+                cell.* = .{ .value = 0 };
+            }
+            new_board.* = Self{
+                .cells = cells,
+            };
+            return new_board;
         }
-        new_board.* = GameBoard{
-            .cells = cells,
-            .params = game_params,
-        };
-        return new_board;
-    }
-    pub fn destroy(self: *GameBoard, allocator: *const std.mem.Allocator) void {
-        allocator.destroy(&self.cells);
-        allocator.destroy(self);
-    }
-
-    pub fn set_cell_at_row(self: *GameBoard, row_index: usize, column_index: usize, color: u64) MastermindError!void {
-        try self.cells[row_index].set_cell(column_index, color);
-    }
-
-    pub fn set_cell(self: *GameBoard, column_index: usize, color: u64) MastermindError!void {
-        return try self.set_cell_at_row(self.current_row, column_index, color);
-    }
-
-    pub fn get_row(self: *GameBoard, row_index: ?usize) [GameBoard.params.row_width]u64 {
-        return self.cells[row_index orelse self.current_row].get_all();
-    }
-
-    pub fn get_last_row(self: *GameBoard) [GameBoard.params.row_width]u64 {
-        return self.get_row(null);
-    }
-
-    pub fn set_row(self: *GameBoard, row_index: usize, row: [GameBoard.params.row_width]u64) void {
-        for (0..self.params.row_width) |i| {
-            self.set_cell_at_row(row_index, i, row[i]);
+        pub fn destroy(self: *Self, allocator: *const std.mem.Allocator) void {
+            allocator.destroy(&self.cells);
+            allocator.destroy(self);
         }
-    }
 
-    pub fn play_next_move(self: *GameBoard, row: [GameBoard.params.row_width]u64) void {
-        self.set_row(self.current_row, row);
-        self.current_row += 1;
-    }
-
-    pub fn is_lost(self: *GameBoard) bool {
-        return self.current_row >= self.params.row_count;
-    }
-
-    /// Flags the row as validated by the player, i.e., row is ready for evaluation
-    pub fn validate_current_row(self: *GameBoard) MastermindError!void {
-        if (self.is_lost()) {
-            return .GameLost;
+        pub fn set_cell_at_row(self: *Self, row_index: usize, column_index: usize, color: u64) MastermindError!void {
+            try self.cells[row_index].set_cell(column_index, color);
         }
-        self.current_row += 1;
-    }
 
-    pub inline fn get_secret(self: *GameBoard) Row {
-        return self.cells[0];
-    }
+        pub fn set_cell(self: *Self, column_index: usize, color: u64) MastermindError!void {
+            return try self.set_cell_at_row(self.current_row, column_index, color);
+        }
 
-    pub fn evaluate_row(self: *GameBoard, row_index: ?usize) RowScore {
-        return self.cells[row_index orelse self.current_row].evaluate(self.get_secret());
-    }
+        pub fn get_row(self: *Self, row_index: ?usize) [params.row_width]u64 {
+            return self.cells[row_index orelse self.current_row].get_all();
+        }
 
-    pub fn evaluate_last(self: *GameBoard) RowScore {
-        return self.cells[self.current_row].evaluate(self.get_secret());
-    }
-};
+        pub fn get_last_row(self: *Self) [params.row_width]u64 {
+            return self.get_row(null);
+        }
+
+        pub fn set_row(self: *Self, row_index: usize, row: [params.row_width]u64) void {
+            for (0..self.params.row_width) |i| {
+                self.set_cell_at_row(row_index, i, row[i]);
+            }
+        }
+
+        pub fn play_next_move(self: *Self, row: [params.row_width]u64) void {
+            self.set_row(self.current_row, row);
+            self.current_row += 1;
+        }
+
+        pub fn is_lost(self: *Self) bool {
+            return self.current_row >= self.params.row_count;
+        }
+
+        /// Flags the row as validated by the player, i.e., row is ready for evaluation
+        pub fn validate_current_row(self: *Self) MastermindError!void {
+            if (self.is_lost()) {
+                return .GameLost;
+            }
+            self.current_row += 1;
+        }
+
+        pub inline fn get_secret(self: *Self) Row {
+            return self.cells[0];
+        }
+
+        pub fn evaluate_row(self: *Self, row_index: ?usize) RowScore {
+            return self.cells[row_index orelse self.current_row].evaluate(self.get_secret());
+        }
+
+        pub fn evaluate_last(self: *Self) RowScore {
+            return self.cells[self.current_row].evaluate(self.get_secret());
+        }
+    };
+}
+
+const TestGameBoard = GameBoard(default_game_params);
 
 pub fn get_color_set(comptime color_count: comptime_int) [color_count]u64 {
     var colors: [color_count]u64 = undefined;
@@ -238,20 +241,20 @@ test "evaluate row" {
 
 test "init game" {
     var cells = [_]Row{.{ .value = 0 }} ** default_game_size;
-    const board = GameBoard{ .cells = &cells };
+    const board = TestGameBoard{ .cells = &cells };
     _ = board;
 }
 
 test "alloc game board" {
     const allocator = std.heap.page_allocator;
-    const board = try GameBoard.create(&allocator, null);
+    const board = try TestGameBoard.create(&allocator);
     defer board.destroy(&allocator);
 }
 
 test "evaluate last" {
     const colors = get_color_set(8);
     const allocator = std.heap.page_allocator;
-    var board = try GameBoard.create(&allocator, null);
+    var board = try TestGameBoard.create(&allocator);
 
     for (0..default_row_width) |i| {
         try board.set_cell(i, colors[i]);

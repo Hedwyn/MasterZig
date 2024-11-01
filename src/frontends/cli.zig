@@ -90,60 +90,67 @@ pub const Console = struct {
     }
 };
 
-pub const GameRunner = struct {
-    console: *Console,
-    board: *engine.GameBoard,
+pub fn GameRunner(parameters: engine.GameParameters) type {
+    return struct {
+        console: *Console,
+        board: *engine.GameBoard(parameters),
+        const params: engine.GameParameters = parameters;
+        const Self = @This();
 
-    pub fn set_secret(self: *GameRunner) GameError!void {
-        assert(self.board.current_row == 0);
-        self.console.write("Input your secret here:\n");
-        const player_input = try self.console.read();
-        try self.process_user_input(player_input);
-        self.console.write("Secret saved !");
-    }
-
-    pub fn show_last_row(self: *GameRunner) void {
-        const raw_colors = self.board.get_last_row();
-        std.log.debug("raw_colors {any}", .{raw_colors});
-
-        for (raw_colors) |color_value| {
-            std.log.debug("Converting value 0x{x} to enum", .{color_value});
-            const color: Color = @enumFromInt(color_value);
-            const repr = color.to_str();
-            self.console.write(repr);
+        pub fn set_secret(self: *Self) GameError!void {
+            assert(self.board.current_row == 0);
+            self.console.write("Input your secret here:\n");
+            const player_input = try self.console.read();
+            try self.process_user_input(player_input);
+            self.console.write("Secret saved !");
         }
-        self.console.write("\n");
-    }
-    pub fn play_next(self: *GameRunner) GameError!void {
-        const player_input = try self.console.read();
-        try self.process_user_input(player_input);
-        const score = self.board.evaluate_last();
-        self.console.print("Your score: {}", .{score});
-    }
 
-    pub fn process_user_input(self: *GameRunner, input: [buffer_len]u8) GameError!void {
-        for (0.., input) |idx, char| {
-            // TODO: switch to null-terminated string
-            if (char == '\n') {
-                break;
+        pub fn show_last_row(self: *Self) void {
+            const raw_colors = self.board.get_last_row();
+            std.log.debug("raw_colors {any}", .{raw_colors});
+
+            for (raw_colors) |color_value| {
+                std.log.debug("Converting value 0x{x} to enum", .{color_value});
+                const color: Color = @enumFromInt(color_value);
+                const repr = color.to_str();
+                self.console.write(repr);
             }
-            if (idx >= self.board.params.row_width) {
-                return GameError.LineTooLong;
-            }
-            const color = try Color.from_str(char);
-            try self.board.set_cell(idx, @intFromEnum(color));
+            self.console.write("\n");
         }
-        self.board.current_row += 1;
-    }
-};
+        pub fn play_next(self: *Self) GameError!void {
+            const player_input = try self.console.read();
+            try self.process_user_input(player_input);
+            const score = self.board.evaluate_last();
+            self.console.print("Your score: {}", .{score});
+        }
+
+        pub fn process_user_input(self: *Self, input: [buffer_len]u8) GameError!void {
+            for (0.., input) |idx, char| {
+                // TODO: switch to null-terminated string
+                if (char == '\n') {
+                    break;
+                }
+                if (idx >= params.row_width) {
+                    return GameError.LineTooLong;
+                }
+                const color = try Color.from_str(char);
+                try self.board.set_cell(idx, @intFromEnum(color));
+            }
+            self.board.current_row += 1;
+        }
+    };
+}
 
 pub fn play() !void {
     var console = Console.create();
     const allocator = std.heap.page_allocator;
-    var board = try engine.GameBoard.create(&allocator, null);
+    var board = try engine.GameBoard(engine.default_game_params).create(&allocator);
     defer board.destroy(&allocator);
     std.log.debug("Color values: {any}", .{_base_color_set});
-    var runner = GameRunner{ .console = &console, .board = board };
+    var runner = GameRunner(engine.default_game_params){
+        .console = &console, //
+        .board = board,
+    };
     console.write("Starting MasterZig !\n");
 
     // TODO: set secret with random data
