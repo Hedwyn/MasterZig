@@ -94,6 +94,18 @@ pub const Console = struct {
         }
         return self.buffer;
     }
+
+    pub fn readToBuffer(self: *Console, buffer: []u8) !void {
+        _ = self.reader.readAtLeast(buffer, buffer.len) catch {
+            return CliError.LineTooShort;
+        };
+        const termination = self.reader.readByte() catch {
+            return CliError.LineTooLong;
+        };
+        if (termination != '\n') {
+            return CliError.LineTooLong;
+        }
+    }
 };
 
 pub fn GameRunner(parameters: engine.GameParameters) type {
@@ -103,22 +115,28 @@ pub fn GameRunner(parameters: engine.GameParameters) type {
         const params: engine.GameParameters = parameters;
         const Self = @This();
 
+        pub fn process_user_input(input: [params.row_width]u8) GameError![params.row_width]u64 {
+            var colors: [params.row_width]u64 = undefined;
+            for (0.., input) |i, char| {
+                colors[i] = @intFromEnum(try Color.from_str(char));
+            }
+            return colors;
+        }
+
         pub fn set_secret(self: *Self) GameError!void {
             assert(self.board.current_row == 0);
+            var player_input: [params.row_width]u8 = undefined;
             self.console.write("Input your secret here:\n");
-            const player_input = try self.console.read(params.row_width);
+            try self.console.readToBuffer(&player_input);
             std.log.debug("Input echo: {s}", .{player_input});
-            try self.process_user_input(player_input);
+            try self.board.play_next_move(try process_user_input(player_input));
             self.console.write("Secret saved !\n");
             self.show_last_row();
         }
 
         pub fn show_last_row(self: *Self) void {
             const raw_colors = self.board.get_last_row();
-            std.log.debug("raw_colors {any}", .{raw_colors});
-
             for (raw_colors) |color_value| {
-                // std.log.debug("Converting value 0x{x} to enum", .{color_value});
                 const color: Color = @enumFromInt(color_value);
                 const repr = color.to_str();
                 self.console.write(repr);
@@ -126,26 +144,12 @@ pub fn GameRunner(parameters: engine.GameParameters) type {
             self.console.write("\n");
         }
         pub fn play_next(self: *Self) GameError!void {
-            const player_input = try self.console.read(params.row_width);
+            var player_input: [params.row_width]u8 = undefined;
+            try self.console.readToBuffer(&player_input);
             std.log.debug("Input echo: {s}", .{player_input});
-            try self.process_user_input(player_input);
+            try self.board.play_next_move(try process_user_input((player_input)));
             const score = self.board.evaluate_last();
-            self.console.print("Your score: {}", .{score});
-            self.board.current_row += 1;
-        }
-
-        pub fn process_user_input(self: *Self, input: [buffer_len]u8) GameError!void {
-            for (0.., input) |idx, char| {
-                // TODO: switch to null-terminated string
-                if (char == '\n') {
-                    break;
-                }
-                if (idx >= params.row_width) {
-                    return GameError.LineTooLong;
-                }
-                const color = try Color.from_str(char);
-                try self.board.set_cell(idx, @intFromEnum(color));
-            }
+            self.console.print("Your score: {}\n", .{score});
         }
     };
 }
@@ -178,9 +182,10 @@ pub fn play(from_file: ?[]const u8) !void {
     console.write("Your secret is:\n");
     runner.show_last_row();
     // Revealing secret for debugging
-    for (0..12) |_| {
+    for (0..3) |_| {
         console.write("Play your next turn !\n");
         try runner.play_next();
+        std.log.debug("Tour {}", .{board.current_row});
         console.write("You played:\n");
         runner.show_last_row();
     }

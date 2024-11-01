@@ -137,21 +137,22 @@ pub fn GameBoard(comptime parameters: GameParameters) type {
         }
 
         pub fn get_row(self: *Self, row_index: ?usize) [params.row_width]u64 {
-            return self.cells[row_index orelse self.current_row].get_all();
+            // TODO check if index > 0
+            return self.cells[row_index orelse self.current_row - 1].get_all();
         }
 
         pub fn get_last_row(self: *Self) [params.row_width]u64 {
             return self.get_row(null);
         }
 
-        pub fn set_row(self: *Self, row_index: usize, row: [params.row_width]u64) void {
-            for (0..self.params.row_width) |i| {
-                self.set_cell_at_row(row_index, i, row[i]);
+        pub fn set_row(self: *Self, row_index: usize, row: [params.row_width]u64) !void {
+            for (0..params.row_width) |i| {
+                try self.set_cell_at_row(row_index, i, row[i]);
             }
         }
 
-        pub fn play_next_move(self: *Self, row: [params.row_width]u64) void {
-            self.set_row(self.current_row, row);
+        pub fn play_next_move(self: *Self, row: [params.row_width]u64) !void {
+            try self.set_row(self.current_row, row);
             self.current_row += 1;
         }
 
@@ -176,7 +177,7 @@ pub fn GameBoard(comptime parameters: GameParameters) type {
         }
 
         pub fn evaluate_last(self: *Self) RowScore {
-            return self.cells[self.current_row].evaluate(self.get_secret());
+            return self.cells[self.current_row - 1].evaluate(self.get_secret());
         }
     };
 }
@@ -260,6 +261,7 @@ test "evaluate last" {
     for (0..default_row_width) |i| {
         try board.set_cell(i, colors[i]);
     }
+    board.current_row += 1;
     const result = board.evaluate_last();
     try std.testing.expectEqual(5, result.correct_color);
     try std.testing.expectEqual(0, result.correct_token);
