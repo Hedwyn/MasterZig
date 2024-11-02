@@ -134,15 +134,45 @@ pub fn GameRunner(parameters: engine.GameParameters) type {
             self.show_last_row();
         }
 
-        pub fn show_last_row(self: *Self) void {
-            const raw_colors = self.board.get_last_row();
+        pub fn show_row(self: *Self, index: usize) void {
+            self.console.write("\u{001b}[48;5;250m");
+            defer self.console.write("\n");
+
+            defer self.console.write("\u{001b}[40m");
+            const raw_colors = self.board.get_row(index);
             for (raw_colors) |color_value| {
                 const color: Color = @enumFromInt(color_value);
                 const repr = color.to_str();
                 self.console.write(repr);
             }
-            self.console.write("\n");
+            // Adding a space to separate scores
+            self.console.write(" ");
+            var token_ctr: usize = 0;
+            const score = self.board.evaluate_row(index);
+            for (0..score.correct_token) |_| {
+                self.console.write("\u{001b}[37mW\u{001b}[37m");
+                token_ctr += 1;
+            }
+            for (0..score.correct_color) |_| {
+                self.console.write("\u{001b}[30mB\u{001b}[37m");
+                token_ctr += 1;
+            }
+
+            for (token_ctr..params.row_width) |_| {
+                self.console.write(" ");
+            }
         }
+
+        pub fn show_last_row(self: *Self) void {
+            self.show_row(self.board.current_row - 1);
+        }
+
+        pub fn show_all_rows(self: *Self) void {
+            for (1..self.board.current_row) |i| {
+                self.show_row(i);
+            }
+        }
+
         pub fn play_next(self: *Self) GameError!bool {
             var player_input: [params.row_width]u8 = undefined;
             try self.console.readToBuffer(&player_input);
@@ -185,13 +215,13 @@ pub fn play(from_file: ?[]const u8) !void {
     runner.show_last_row();
     // Revealing secret for debugging
     for (0..3) |_| {
-        console.write("Play your next turn !\n");
+        console.write("\nPlay your next turn !\n");
         if (try runner.play_next()) {
             console.write("Congratulations, you won !\n");
             return;
         }
         std.log.debug("Tour {}", .{board.current_row});
-        console.write("You played:\n");
-        runner.show_last_row();
+        console.write("Current board: \n\n");
+        runner.show_all_rows();
     }
 }
