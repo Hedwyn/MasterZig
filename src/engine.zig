@@ -1,4 +1,5 @@
 const std = @import("std");
+const math = std.math;
 const testing = std.testing;
 
 // Default parameters
@@ -81,19 +82,32 @@ pub fn Row(color_count: comptime_int, width: comptime_int) type {
             var correct_color: u8 = 0;
             var correct_token: u8 = 0;
             var value = self.value;
+            var secret_value = secret.value;
+            const mask = (1 << (color_count * width)) - 1;
             inline for (0..self.color_count) |shift| {
-                const mask = secret.value & value;
+                const colors_matches = secret_value & value;
                 // A token is correct if its equal to the secret without shifting
                 if (shift == 0) {
-                    correct_color += @popCount(mask);
+                    correct_color += @popCount(colors_matches);
                 }
                 // After a shift, getting a match means the color is present but
                 // the position is wrong
                 else {
-                    correct_token += @popCount(mask);
+                    correct_token += @popCount(colors_matches);
                 }
                 // clearing the tokens that were matching as we consumed them
-                value ^= mask;
+                secret_value ^= colors_matches;
+                value ^= colors_matches;
+
+                // shifting
+                const lshift = color_count;
+                const rshift = (width - 1) * color_count;
+                // Mask isolating the first color, as we need to rotate it back to the other end
+                const first_color_mask = ((1 << color_count) - 1) << rshift;
+
+                value = value << lshift | ((value & first_color_mask) >> rshift);
+                // removing out-of-bounds bits pushed there due to shifting
+                value &= mask;
             }
             return .{ .correct_color = correct_color, .correct_token = correct_token };
         }
@@ -153,6 +167,7 @@ pub fn GameBoard(comptime parameters: GameParameters) type {
 
         pub fn play_next_move(self: *Self, row: [params.row_width]u64) !void {
             try self.set_row(self.current_row, row);
+            std.log.debug("Current row values: {x}", .{self.cells[self.current_row].value});
             self.current_row += 1;
         }
 
@@ -253,7 +268,7 @@ test "alloc game board" {
     defer board.destroy(&allocator);
 }
 
-test "evaluate last" {
+test "evaluate last winning case" {
     const colors = get_color_set(8);
     const allocator = std.heap.page_allocator;
     var board = try TestGameBoard.create(&allocator);
@@ -266,4 +281,27 @@ test "evaluate last" {
     try std.testing.expectEqual(5, result.correct_color);
     try std.testing.expectEqual(0, result.correct_token);
     try std.testing.expectEqual(board.evaluate_row(0), result);
+}
+
+test "evaluate last" {
+    const colors = get_color_set(8);
+    const allocator = std.heap.page_allocator;
+    var board = try TestGameBoard.create(&allocator);
+
+    const secret_colors = [_]usize{ 1, 2, 3, 4, 2 };
+    const played_colors = [_]usize{ 2, 1, 3, 4, 1 };
+
+    for (0..default_row_width) |i| {
+        try board.set_cell(i, colors[secret_colors[i]]);
+    }
+    board.current_row += 1;
+    for (0..default_row_width) |i| {
+        try board.set_cell(i, colors[played_colors[i]]);
+    }
+    std.debug.print("\nLast row= {x:0>16}\n", .{board.cells[board.current_row].value});
+    board.current_row += 1;
+
+    const result = board.evaluate_last();
+    try std.testing.expectEqual(2, result.correct_color);
+    try std.testing.expectEqual(2, result.correct_token);
 }
