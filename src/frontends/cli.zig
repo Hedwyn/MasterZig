@@ -29,14 +29,14 @@ pub const Color = enum(u32) {
 
     pub fn to_str(self: Color) []const u8 {
         return switch (self) {
-            .red => "R",
-            .green => "G",
-            .blue => "B",
-            .yellow => "Y",
-            .brown => "W",
-            .pink => "P",
-            .turquoise => "T",
-            .orange => "O",
+            .red => "\u{001b}[31mR\u{001b}[37m",
+            .green => "\u{001b}[32mG\u{001b}[37m",
+            .blue => "\u{001b}[34mB\u{001b}[37m",
+            .yellow => "\u{001b}[33mG\u{001b}[37m",
+            .brown => "\u{001b}[36mG\u{001b}[37m",
+            .pink => "\u{001b}[38;5;165mP\u{001b}[37m",
+            .turquoise => "\u{001b}[38;5;122mT\u{001b}[37m",
+            .orange => "\u{001b}[38;5;209mO\u{001b}[37m",
         };
     }
 

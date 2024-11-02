@@ -108,6 +108,10 @@ pub fn Row(color_count: comptime_int, width: comptime_int) type {
                 value = value << lshift | ((value & first_color_mask) >> rshift);
                 // removing out-of-bounds bits pushed there due to shifting
                 value &= mask;
+                // Detecting early termination - if value is 0, nothing to test left
+                if (value == 0) {
+                    break;
+                }
             }
             return .{ .correct_color = correct_color, .correct_token = correct_token };
         }
