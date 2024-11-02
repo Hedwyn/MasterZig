@@ -2,12 +2,19 @@
 
 const engine = @import("../engine.zig");
 const std = @import("std");
+const bufPrint = std.fmt.bufPrint;
 const File = std.fs.File;
 const Writer = File.Writer;
 const Reader = File.Reader;
 
 const assert = std.debug.assert;
 const _base_color_set: [8]u64 = engine.get_color_set(8);
+
+// terminal color
+const esc = "\u{001b}";
+const default_background = esc ++ "[40m";
+const board_background = esc ++ "[48;5;130m";
+const default_color = esc ++ "[37m";
 
 pub const CliError = error{
     InvalidColor,
@@ -27,9 +34,17 @@ pub const Color = enum(u32) {
     turquoise = _base_color_set[6],
     orange = _base_color_set[7],
 
+    pub fn colorize(_: Color, color_index: comptime_int, comptime content: []const u8) []const u8 {
+        assert(color_index >= 0);
+        assert(color_index < 256);
+        comptime var color_buf: [3]u8 = undefined;
+        const color_code = comptime std.fmt.bufPrint(&color_buf, "{}", .{color_index}) catch unreachable;
+        return esc ++ "[38;5;" ++ color_code ++ "m" ++ content ++ default_color;
+    }
+
     pub fn to_str(self: Color) []const u8 {
         return switch (self) {
-            .red => "\u{001b}[31mR\u{001b}[37m",
+            .red => self.colorize(160, "R"),
             .green => "\u{001b}[32mG\u{001b}[37m",
             .blue => "\u{001b}[34mB\u{001b}[37m",
             .yellow => "\u{001b}[33mG\u{001b}[37m",
@@ -135,10 +150,9 @@ pub fn GameRunner(parameters: engine.GameParameters) type {
         }
 
         pub fn show_row(self: *Self, index: usize) void {
-            self.console.write("\u{001b}[48;5;250m");
+            self.console.write(board_background);
             defer self.console.write("\n");
-
-            defer self.console.write("\u{001b}[40m");
+            defer self.console.write(default_background);
             const raw_colors = self.board.get_row(index);
             for (raw_colors) |color_value| {
                 const color: Color = @enumFromInt(color_value);
