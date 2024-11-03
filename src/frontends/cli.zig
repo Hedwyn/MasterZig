@@ -13,7 +13,7 @@ const _base_color_set: [8]u64 = engine.get_color_set(8);
 // terminal color
 const esc = "\u{001b}";
 const default_background = esc ++ "[40m";
-const board_background = esc ++ "[48;5;130m";
+const board_background = esc ++ "[48;5;102m";
 const default_color = esc ++ "[37m";
 
 pub const CliError = error{
@@ -44,14 +44,14 @@ pub const Color = enum(u32) {
 
     pub fn to_str(self: Color) []const u8 {
         return switch (self) {
-            .red => self.colorize(160, "R"),
-            .green => "\u{001b}[32mG\u{001b}[37m",
-            .blue => "\u{001b}[34mB\u{001b}[37m",
-            .yellow => "\u{001b}[33mG\u{001b}[37m",
-            .brown => "\u{001b}[36mG\u{001b}[37m",
-            .pink => "\u{001b}[38;5;165mP\u{001b}[37m",
-            .turquoise => "\u{001b}[38;5;122mT\u{001b}[37m",
-            .orange => "\u{001b}[38;5;209mO\u{001b}[37m",
+            .red => self.colorize(88, "R"),
+            .green => self.colorize(82, "G"),
+            .blue => self.colorize(26, "B"),
+            .yellow => self.colorize(220, "Y"),
+            .brown => self.colorize(130, "N"),
+            .pink => self.colorize(199, "P"),
+            .turquoise => self.colorize(121, "T"),
+            .orange => self.colorize(166, "O"),
         };
     }
 
