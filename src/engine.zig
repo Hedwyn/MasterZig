@@ -31,6 +31,54 @@ pub const RowScore = struct {
     correct_token: u32 = 0,
 };
 
+pub inline fn evaluate(
+    value: u64, //
+    secret: u64,
+    expected_correct_token: usize,
+    expected_correct_color: usize,
+    color_count: comptime_int,
+    width: comptime_int,
+) bool {
+    var correct_token: u8 = 0;
+    var secret_value = secret.value;
+    const mask = (1 << (color_count * width)) - 1;
+    inline for (0..color_count) |shift| {
+        const colors_matches = secret_value & value;
+        // A token is correct if its equal to the secret without shifting
+        if (shift == 0) {
+            if (@popCount(colors_matches) != expected_correct_color) {
+                return false;
+            }
+        }
+        // After a shift, getting a match means the color is present but
+        // the position is wrong
+        else {
+            correct_token += @popCount(colors_matches);
+            if (correct_token > expected_correct_token) {
+                return false;
+            }
+        }
+        // clearing the tokens that were matching as we consumed them
+        secret_value ^= colors_matches;
+        value ^= colors_matches;
+
+        // shifting
+        const lshift = color_count;
+        const rshift = (width - 1) * color_count;
+        // Mask isolating the first color, as we need to rotate it back to the other end
+        const first_color_mask = ((1 << color_count) - 1) << rshift;
+
+        value = value << lshift | ((value & first_color_mask) >> rshift);
+        // removing out-of-bounds bits pushed there due to shifting
+        value &= mask;
+        // Detecting early termination - if value is 0, nothing to test left
+        if (value == 0) {
+            break;
+        }
+    }
+    return (correct_token == expected_correct_token);
+}
+
 pub fn Row(color_count: comptime_int, width: comptime_int) type {
     return struct {
         value: u64 = 0,
