@@ -1,4 +1,6 @@
 const std = @import("std");
+const log = @import("log.zig");
+const masterzig_log = log.masterzig_log;
 const math = std.math;
 const testing = std.testing;
 
@@ -219,7 +221,7 @@ pub fn GameBoard(comptime parameters: GameParameters) type {
 
         pub fn play_next_move(self: *Self, row: [params.row_width]u64) !void {
             try self.set_row(self.current_row, row);
-            std.log.debug("Current row values: {x}", .{self.cells[self.current_row].value});
+            masterzig_log.debug("Current row values: {x}", .{self.cells[self.current_row].value});
             self.current_row += 1;
         }
 

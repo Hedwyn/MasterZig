@@ -1,7 +1,9 @@
 //! A game frontend that can run in the terminal
-
-const engine = @import("../engine.zig");
 const std = @import("std");
+const engine = @import("../engine.zig");
+const log = @import("../log.zig");
+
+const masterzig_log = log.masterzig_log;
 const bufPrint = std.fmt.bufPrint;
 const File = std.fs.File;
 const Writer = File.Writer;
@@ -143,7 +145,7 @@ pub fn GameRunner(parameters: engine.GameParameters) type {
             var player_input: [params.row_width]u8 = undefined;
             self.console.write("Input your secret here:\n");
             try self.console.readToBuffer(&player_input);
-            std.log.debug("Input echo: {s}", .{player_input});
+            masterzig_log.debug("Input echo: {s}", .{player_input});
             try self.board.play_next_move(try process_user_input(player_input));
             self.console.write("Secret saved !\n");
             self.show_last_row();
@@ -190,7 +192,7 @@ pub fn GameRunner(parameters: engine.GameParameters) type {
         pub fn play_next(self: *Self) GameError!bool {
             var player_input: [params.row_width]u8 = undefined;
             try self.console.readToBuffer(&player_input);
-            std.log.debug("Input echo: {s}", .{player_input});
+            masterzig_log.debug("Input echo: {s}", .{player_input});
             try self.board.play_next_move(try process_user_input((player_input)));
             const score = self.board.evaluate_last();
             self.console.print("Your score: {}\n", .{score});
@@ -216,7 +218,7 @@ pub fn play(from_file: ?[]const u8) !void {
     const allocator = std.heap.page_allocator;
     var board = try engine.GameBoard(engine.default_game_params).create(&allocator);
     defer board.destroy(&allocator);
-    std.log.debug("Color values: {any}", .{_base_color_set});
+    masterzig_log.debug("Color values: {any}", .{_base_color_set});
     var runner = GameRunner(engine.default_game_params){
         .console = &console, //
         .board = board,
@@ -234,7 +236,7 @@ pub fn play(from_file: ?[]const u8) !void {
             console.write("Congratulations, you won !\n");
             return;
         }
-        std.log.debug("Tour {}", .{board.current_row});
+        masterzig_log.debug("Tour {}", .{board.current_row});
         console.write("Current board: \n\n");
         runner.show_all_rows();
     }
