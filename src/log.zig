@@ -3,7 +3,7 @@ const std = @import("std");
 const LoggingLevel = std.log.Level;
 pub const masterzig_log = std.log.scoped(.masterzig);
 
-var log_level = LoggingLevel.debug;
+var log_level = LoggingLevel.warn;
 
 pub fn setLogLevel(level: LoggingLevel) void {
     log_level = level;

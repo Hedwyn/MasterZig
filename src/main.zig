@@ -8,6 +8,14 @@ const ArgIterator = std.process.ArgIterator;
 const assert = std.debug.assert;
 const LoggingLevel = std.log.Level;
 
+pub const std_options = .{
+    // Set the log level to info
+    .log_level = .debug,
+
+    // Define logFn to override the std implementation
+    .logFn = log.logFn,
+};
+
 const StrError = error{
     DestinationTooSmall,
 };
@@ -93,15 +101,10 @@ const CliArgs = struct {
 };
 
 pub fn main() !void {
-    masterzig_log.debug("Hi !", .{});
     var args = std.process.args();
-    // First arg is exe name
-    // _ = args.next();
-    // const fname: ?[]const u8 = args.next();
     const cmd_args = try CliArgs.parse(&args);
-    // const from_file = fname orelse null;
-
-    // const replay_file = if (cmd_args.replay_file[0] != 0) cmd_args.replay_file else null;
     std.debug.print("Cmd args are {?s}, {}", .{ cmd_args.replay_file, cmd_args.log_level });
-    try cli.play(null);
+    log.setLogLevel(cmd_args.log_level);
+    masterzig_log.debug("Hi !", .{});
+    try cli.play(cmd_args.replay_file);
 }
